@@ -1,361 +1,135 @@
-# 🛰️ EuroSAT Multimodal Land Use Classification
+# 🛰️ EuroSAT Multimodal Land Classification — Web App
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)]()
-[![PyTorch](https://img.shields.io/badge/PyTorch-Deep%20Learning-red.svg)]()
-[![Flask](https://img.shields.io/badge/Flask-Web%20Application-black.svg)]()
-[![License](https://img.shields.io/badge/License-MIT-green.svg)]()
+**B.Tech 4th Semester | CSET301 AIML | 2025**
 
-A deep learning-based satellite image classification system that identifies land-use categories from EuroSAT imagery using Optical, SAR, and Multimodal Fusion models built with ResNet-18.
-
-The project includes model training, evaluation, and deployment through a Flask-based web application for real-time predictions.
-
----
-
-## 📌 Project Overview
-
-Remote sensing imagery plays a critical role in:
-
-- Urban Planning
-- Agriculture Monitoring
-- Environmental Analysis
-- Disaster Management
-- Land Cover Mapping
-
-This project leverages Deep Learning and Transfer Learning to classify satellite images into 10 land-use categories using the EuroSAT dataset.
-
-Three separate models are implemented:
-
-1. Optical ResNet18 Model
-2. SAR ResNet18 Model
-3. Multimodal Fusion ResNet18 Model
-
-The Fusion model combines information from multiple image modalities to improve classification performance.
-
----
-
-## 🚀 Features
-
-✔ Land-use classification from satellite images
-
-✔ Optical image model
-
-✔ SAR image model
-
-✔ Multimodal fusion model
-
-✔ Interactive Flask web application
-
-✔ Real-time prediction results
-
-✔ Confidence score visualization
-
-✔ REST API support
-
-✔ Transfer learning using ResNet18
-
----
-
-## 🗂 Dataset
-
-This project uses the EuroSAT Dataset.
-
-### Classes
-
-| Class |
-|---------|
-| AnnualCrop |
-| Forest |
-| HerbaceousVegetation |
-| Highway |
-| Industrial |
-| Pasture |
-| PermanentCrop |
-| Residential |
-| River |
-| SeaLake |
-
-Dataset Size:
-
-- 27,000+ images
-- 10 classes
-- RGB Satellite Images
-
----
-
-## 🏗 Model Architecture
-
-### Optical Model
-
-Input:
-RGB Satellite Image
-
-Architecture:
-
-ResNet18
-↓
-Global Average Pooling
-↓
-Fully Connected Layer
-↓
-10 Classes
-
----
-
-### SAR Model
-
-Input:
-SAR / Alternative Spectral Representation
-
-Architecture:
-
-ResNet18
-↓
-Classification Head
-↓
-10 Classes
-
----
-
-### Fusion Model
-
-Input:
-
-Optical Features
-+
-SAR Features
-
-Architecture:
-
-ResNet18 (Optical)
-        ↓
-Feature Fusion Layer
-        ↓
-ResNet18 (SAR)
-        ↓
-Fully Connected Layer
-        ↓
-Prediction
-
----
-
-## 📊 Training Pipeline
-
-1. Data Loading
-2. Data Augmentation
-3. Train/Validation Split
-4. Transfer Learning
-5. Fine-Tuning
-6. Evaluation
-7. Model Export
+Full-stack web application deploying your trained ResNet-18 land classification models with a Flask backend and live inference frontend.
 
 ---
 
 ## 📁 Project Structure
 
-```text
-EuroSAT-Multimodal-Land-Classification/
+```
+eurosat_app/
 │
-├── app/
-│   ├── app.py
-│   ├── requirements.txt
-│   ├── models/
-│   └── templates/
-│
-├── notebooks/
-│   └── EuroSat_Main_Ai.ipynb
-│
-├── docs/
-│   └── screenshots/
-│
+├── app.py                        ← Flask backend (PyTorch inference API)
+├── requirements.txt              ← Python dependencies
 ├── README.md
-├── LICENSE
-└── .gitignore
+│
+├── templates/
+│   └── index.html                ← Frontend (auto-served by Flask)
+│
+└── models/                       ← ✅ Your trained weights (already included)
+    ├── resnet18_optical_best.pth  (Model A — 44 MB)
+    ├── resnet18_sar_best.pth      (Model B — 44 MB)
+    └── resnet18_fusion_best.pth   (Model C — 88 MB)
 ```
 
 ---
 
-## ⚙️ Installation
+## ⚡ Quick Start (3 Steps)
 
-### Clone Repository
+### Step 1 — Install dependencies
 
 ```bash
-git clone https://github.com/yourusername/EuroSAT-Multimodal-Land-Classification.git
-
-cd EuroSAT-Multimodal-Land-Classification
+pip install -r requirements.txt
 ```
 
-### Create Virtual Environment
+### Step 2 — Run the server
 
 ```bash
-python -m venv venv
-```
-
-Activate Environment
-
-Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-Linux/Mac:
-
-```bash
-source venv/bin/activate
-```
-
-### Install Dependencies
-
-```bash
-pip install -r app/requirements.txt
-```
-
----
-
-## ▶ Running the Application
-
-```bash
-cd app
-
 python app.py
 ```
 
-Open Browser:
-
-```text
-http://localhost:5000
+You'll see:
 ```
+[INFO] 🛰️  EuroSAT Backend → http://localhost:5000
+[INFO]    Device : cpu   (or cuda if GPU available)
+[INFO]    Models : {'optical': True, 'sar': True, 'fusion': True}
+```
+
+### Step 3 — Open the app
+
+Visit: **http://localhost:5000**
+
+The status bar at the top will turn **green** when the server is live and all 3 models are detected.
 
 ---
 
-## 🔌 REST API
+## 🔌 API Endpoints
 
-### Check Server Status
+| Method | Endpoint         | Description                             |
+|--------|------------------|-----------------------------------------|
+| GET    | `/`              | Serves the web frontend                 |
+| GET    | `/api/status`    | Server health + model availability      |
+| POST   | `/api/classify`  | Classify an uploaded image              |
+| GET    | `/api/classes`   | List all 10 class names + descriptions  |
 
-```http
-GET /api/status
+### POST /api/classify — Example
+
+```bash
+curl -X POST http://localhost:5000/api/classify \
+  -F "image=@my_patch.png" \
+  -F "model=fusion"
 ```
 
-Response:
-
+**Response:**
 ```json
 {
-  "status": "running"
+  "prediction":    "Forest",
+  "confidence":    0.9234,
+  "description":   "Dense tree cover",
+  "model_type":    "fusion",
+  "device":        "cpu",
+  "probabilities": {
+    "AnnualCrop": 0.0120,
+    "Forest":     0.9234,
+    "HerbaceousVegetation": 0.0310,
+    ...
+  }
 }
 ```
 
 ---
 
-### Get Classes
+## 🌐 Deploy Online (Free)
 
-```http
-GET /api/classes
-```
+### Option A — Render.com (Recommended)
+1. Push this folder to GitHub
+2. Go to https://render.com → New Web Service → Connect repo
+3. Build Command: `pip install -r requirements.txt`
+4. Start Command: `gunicorn app:app`
+5. Done — get a public URL like `https://eurosat.onrender.com`
 
----
-
-### Classify Image
-
-```http
-POST /api/classify
-```
-
-Form Data:
-
-```text
-image : image file
-model : optical | sar | fusion
-```
-
-Example:
-
+### Option B — Ngrok (Instant demo, no GitHub needed)
 ```bash
-curl -X POST http://localhost:5000/api/classify \
--F "image=@sample.jpg" \
--F "model=fusion"
+# Terminal 1
+python app.py
+
+# Terminal 2
+ngrok http 5000
 ```
+Share the ngrok URL with anyone instantly!
 
 ---
 
-## 📈 Evaluation Metrics
+## 📊 Model Architecture
 
-The following metrics are used:
-
-- Accuracy
-- Precision
-- Recall
-- F1 Score
-- Confusion Matrix
-
-Fusion models generally outperform single-modality approaches due to richer feature representations.
+| Model | Input | Architecture | Params |
+|-------|-------|-------------|--------|
+| **A — Optical** | RGB (B4,B3,B2) | ResNet-18 → FC(512→256→10) | 11.2M |
+| **B — SAR**     | NIR/SWIR (B8,B11,B12) | ResNet-18 → FC(512→256→10) | 11.2M |
+| **C — Fusion**  | RGB + NIR/SWIR | Dual ResNet-18 → Concat(1024) → FC | 22.5M |
 
 ---
 
-## 📷 Application Screenshots
+## 🔧 Troubleshooting
 
-### Home Page
-
-Add screenshot here
-
-```md
-![Home](docs/screenshots/home.png)
-```
-
-### Prediction Result
-
-```md
-![Prediction](docs/screenshots/result.png)
-```
+| Problem | Fix |
+|---------|-----|
+| Port 5000 busy | Change `port=5000` to `port=5001` in last line of `app.py` |
+| `ModuleNotFoundError` | Run `pip install -r requirements.txt` |
+| Status bar shows red | Make sure `python app.py` is running |
 
 ---
 
-## 🛠 Technologies Used
-
-### Machine Learning
-
-- PyTorch
-- Torchvision
-- NumPy
-- Pandas
-- Scikit-Learn
-
-### Web Development
-
-- Flask
-- HTML
-- CSS
-- JavaScript
-
-### Visualization
-
-- Matplotlib
-- Seaborn
-
----
-
-## 🔮 Future Improvements
-
-- Deploy on Hugging Face Spaces
-- Docker Support
-- Mobile-Friendly Interface
-- Grad-CAM Explainability
-- Model Quantization
-- AWS Deployment
-
----
-
-## 👨‍💻 Author
-
-**Moksh**
-
-B.Tech (Artificial Intelligence & Machine Learning)
-
-GitHub: https://github.com/yourusername
-
----
-
-## 📜 License
-
-This project is licensed under the MIT License.
-
-Feel free to use, modify, and distribute this project for educational and research purposes.
+*Notebook: EuroSat_Main_Ai.ipynb | Backend: app.py | Frontend: templates/index.html*

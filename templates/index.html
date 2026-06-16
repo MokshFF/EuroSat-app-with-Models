@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EuroSAT Land Classifier — Multimodal Deep Learning</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a0e;
+    --surface: #0c1520;
+    --surface2: #111d2b;
+    --border: #1e3048;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7cff6b;
+    --text: #e8f4ff;
+    --muted: #5a7a99;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,212,255,.03) 1px,transparent 1px), linear-gradient(90deg,rgba(0,212,255,.03) 1px,transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* HEADER */
+  header { border-bottom: 1px solid var(--border); padding: 18px 0; position: sticky; top: 0; background: rgba(5,10,14,.93); backdrop-filter: blur(12px); z-index: 100; }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-family: 'Space Mono',monospace; font-size: 13px; color: var(--accent); letter-spacing: .1em; display: flex; align-items: center; gap: 10px; }
+  .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.6)}50%{box-shadow:0 0 0 6px rgba(0,212,255,0)} }
+  .badge { font-family: 'IBM Plex Mono',monospace; font-size: 10px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 3px 10px; border-radius: 2px; }
+
+  /* STATUS BAR */
+  .status-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 0; }
+  .status-bar .wrap { display: flex; align-items: center; gap: 20px; font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.green { background: var(--accent3); box-shadow: 0 0 6px rgba(124,255,107,.5); }
+  .status-dot.red   { background: var(--accent2); }
+  .status-dot.grey  { background: var(--muted); opacity: .5; }
+  .status-item { display: flex; align-items: center; gap: 6px; }
+
+  /* HERO */
+  .hero { padding: 60px 0 50px; text-align: center; }
+  .hero-label { font-family: 'IBM Plex Mono',monospace; font-size: 11px; letter-spacing: .25em; color: var(--accent); text-transform: uppercase; margin-bottom: 18px; display: inline-block; border: 1px solid rgba(0,212,255,.3); padding: 4px 14px; border-radius: 2px; }
+  .hero h1 { font-size: clamp(1.8rem,5vw,3.2rem); font-weight: 800; line-height: 1.1; margin-bottom: 14px; background: linear-gradient(135deg,#fff 30%,var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero p { font-size: 14px; color: var(--muted); max-width: 540px; margin: 0 auto 36px; line-height: 1.7; }
+  .stats-strip { display: flex; justify-content: center; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; max-width: 680px; margin: 0 auto 60px; }
+  .stat-item { flex: 1; padding: 16px 12px; border-right: 1px solid var(--border); background: var(--surface); text-align: center; }
+  .stat-item:last-child { border-right: none; }
+  .stat-val { font-family: 'Space Mono',monospace; font-size: 18px; color: var(--accent); font-weight: 700; }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-top: 3px; }
+
+  .section-title { font-size: 11px; font-family: 'IBM Plex Mono',monospace; color: var(--accent); letter-spacing: .2em; text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* MODEL CARDS */
+  .models-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 60px; }
+  .model-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; position: relative; overflow: hidden; cursor: pointer; transition: border-color .2s, transform .2s; }
+  .model-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .model-card.optical::before { background: var(--accent); }
+  .model-card.sar::before     { background: var(--accent2); }
+  .model-card.fusion::before  { background: linear-gradient(90deg,var(--accent),var(--accent2)); }
+  .model-card:hover { border-color: rgba(0,212,255,.4); transform: translateY(-2px); }
+  .model-card.selected { border-color: var(--accent); background: rgba(0,212,255,.06); }
+  .model-letter { font-family: 'Space Mono',monospace; font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .model-name   { font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .model-input  { font-size: 11px; font-family: 'IBM Plex Mono',monospace; color: var(--muted); margin-bottom: 14px; }
+  .model-metric { display: flex; justify-content: space-between; background: var(--surface2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 3px; margin-bottom: 6px; }
+  .metric-label { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono',monospace; }
+  .metric-val   { font-family: 'Space Mono',monospace; font-size: 15px; font-weight: 700; }
+  .metric-val.blue   { color: var(--accent); }
+  .metric-val.orange { color: var(--accent2); }
+  .metric-val.green  { color: var(--accent3); }
+  .best-badge { position: absolute; top: 12px; right: 12px; font-size: 9px; font-family: 'IBM Plex Mono',monospace; background: rgba(124,255,107,.15); color: var(--accent3); border: 1px solid rgba(124,255,107,.3); padding: 2px 8px; border-radius: 2px; text-transform: uppercase; }
+  .acc-bar-wrap { margin-top: 10px; height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .acc-bar-fill { height: 100%; border-radius: 2px; animation: fillBar 1.4s ease-out forwards; width: 0; }
+  @keyframes fillBar { to { width: var(--target-w); } }
+
+  /* CLASSES */
+  .classes-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 60px; }
+  .class-card { background: var(--surface); border: 1px solid var(--border); padding: 12px; border-radius: 4px; text-align: center; transition: border-color .2s; }
+  .class-card:hover { border-color: rgba(0,212,255,.4); }
+  .class-emoji { font-size: 20px; margin-bottom: 5px; }
+  .class-name  { font-size: 10px; font-weight: 700; margin-bottom: 2px; }
+  .class-desc  { font-size: 9px; color: var(--muted); font-family: 'IBM Plex Mono',monospace; line-height: 1.4; }
+
+  /* CLASSIFIER */
+  .classifier-section { margin-bottom: 60px; }
+  .classifier-box { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .clf-header { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 12px 22px; display: flex; align-items: center; gap: 10px; font-family: 'IBM Plex Mono',monospace; font-size: 12px; color: var(--muted); }
+  .clf-header span { color: var(--accent); }
+  .clf-body { padding: 26px; }
+
+  .upload-area { border: 2px dashed var(--border); border-radius: 4px; padding: 36px 20px; text-align: center; cursor: pointer; transition: border-color .3s, background .3s; }
+  .upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: rgba(0,212,255,.04); }
+  #fileInput { display: none; }
+  .upload-icon { font-size: 28px; margin-bottom: 10px; }
+  .upload-text { font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  .upload-sub  { font-size: 10px; font-family: 'IBM Plex Mono',monospace; color: var(--muted); opacity: .6; }
+
+  .img-preview-wrap { margin-top: 14px; display: none; }
+  .img-preview-wrap.show { display: flex; gap: 12px; align-items: flex-start; }
+  .img-preview { width: 80px; height: 80px; border-radius: 3px; border: 1px solid var(--border); object-fit: cover; image-rendering: pixelated; }
+  .img-info { font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--muted); }
+  .img-info b { color: var(--text); display: block; margin-bottom: 4px; }
+
+  .model-select-row { display: flex; gap: 8px; margin: 18px 0; }
+  .model-btn { flex: 1; padding: 9px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); font-family: 'IBM Plex Mono',monospace; font-size: 11px; cursor: pointer; border-radius: 3px; transition: all .2s; }
+  .model-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,.08); }
+  .model-btn:hover  { border-color: rgba(0,212,255,.4); color: var(--text); }
+
+  .classify-btn { width: 100%; padding: 14px; background: var(--accent); color: var(--bg); border: none; font-family: 'Syne',sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; border-radius: 3px; transition: all .2s; }
+  .classify-btn:hover { background: #22e0ff; transform: translateY(-1px); }
+  .classify-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  .loading { display: none; align-items: center; gap: 12px; padding: 14px 0; font-family: 'IBM Plex Mono',monospace; font-size: 12px; color: var(--accent); }
+  .loading.show { display: flex; }
+  .spinner { width: 16px; height: 16px; border: 2px solid rgba(0,212,255,.2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error-msg { padding: 14px; background: rgba(255,107,53,.1); border: 1px solid rgba(255,107,53,.3); border-radius: 3px; font-size: 12px; font-family: 'IBM Plex Mono',monospace; color: var(--accent2); margin-top: 14px; white-space: pre-line; display: none; }
+  .error-msg.show { display: block; }
+
+  /* RESULT */
+  .result-panel { margin-top: 22px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 20px; display: none; animation: fadeIn .4s ease; }
+  .result-panel.show { display: block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .result-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .result-class { font-size: 22px; font-weight: 800; color: var(--accent); }
+  .result-desc  { font-size: 12px; color: var(--muted); font-family: 'IBM Plex Mono',monospace; margin-top: 3px; }
+  .result-conf  { text-align: right; }
+  .result-conf-val   { font-family: 'Space Mono',monospace; font-size: 24px; font-weight: 700; color: var(--accent3); }
+  .result-conf-label { font-size: 10px; color: var(--muted); font-family: 'IBM Plex Mono',monospace; text-transform: uppercase; }
+  .result-meta { font-size: 11px; font-family: 'IBM Plex Mono',monospace; color: var(--muted); margin-bottom: 16px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 3px; }
+
+  .result-bars { display: grid; gap: 7px; }
+  .result-bar-row { display: flex; align-items: center; gap: 10px; }
+  .rbl { font-size: 11px; font-family: 'IBM Plex Mono',monospace; color: var(--muted); width: 155px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rbl.top { color: var(--text); font-weight: 500; }
+  .rbt { flex: 1; height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; }
+  .rbf { height: 100%; border-radius: 3px; background: var(--accent); transition: width .7s ease; width: 0; }
+  .rbf.top { background: var(--accent3); }
+  .rbp { font-size: 11px; font-family: 'Space Mono',monospace; color: var(--muted); width: 42px; text-align: right; }
+  .rbp.top { color: var(--accent3); font-weight: 700; }
+
+  /* PIPELINE */
+  .arch-box { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 24px; margin-bottom: 60px; }
+  .pipeline { display: flex; align-items: center; overflow-x: auto; margin-bottom: 20px; }
+  .pipeline-step { background: var(--surface2); border: 1px solid var(--border); padding: 12px 14px; border-radius: 3px; text-align: center; min-width: 100px; flex-shrink: 0; }
+  .step-icon   { font-size: 16px; margin-bottom: 5px; }
+  .step-name   { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+  .step-detail { font-size: 9px; color: var(--muted); font-family: 'IBM Plex Mono',monospace; }
+  .pipeline-arrow { color: var(--accent); font-size: 16px; padding: 0 5px; flex-shrink: 0; }
+  .arch-meta { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+  .arch-meta-item { background: var(--surface2); border: 1px solid var(--border); padding: 12px; border-radius: 3px; }
+  .arch-meta-item h4 { font-size: 10px; font-family: 'IBM Plex Mono',monospace; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+  .arch-meta-item p  { font-size: 12px; font-weight: 700; }
+  .arch-meta-item small { font-size: 10px; color: var(--muted); font-family: 'IBM Plex Mono',monospace; }
+
+  /* INFO */
+  .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 60px; }
+  .info-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 4px; }
+  .info-card h3 { font-size: 12px; font-weight: 700; margin-bottom: 12px; color: var(--accent); font-family: 'IBM Plex Mono',monospace; text-transform: uppercase; letter-spacing: .08em; }
+  .info-list { list-style: none; }
+  .info-list li { font-size: 12px; color: var(--muted); padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 7px; line-height: 1.5; }
+  .info-list li:last-child { border-bottom: none; }
+  .info-list li::before { content: '›'; color: var(--accent); flex-shrink: 0; }
+
+  footer { border-top: 1px solid var(--border); padding: 24px 0; text-align: center; }
+  .footer-text { font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--muted); line-height: 2; }
+  .footer-text a { color: var(--accent); text-decoration: none; }
+
+  @media(max-width:768px){
+    .models-grid { grid-template-columns: 1fr; }
+    .classes-grid { grid-template-columns: repeat(2,1fr); }
+    .info-row { grid-template-columns: 1fr; }
+    .arch-meta { grid-template-columns: 1fr; }
+    .model-select-row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="logo"><div class="logo-dot"></div>EUROSAT · LAND CLASSIFIER</div>
+    <div class="badge">B.Tech AIML · 2025</div>
+  </div>
+</header>
+
+<!-- Live status from Flask /api/status -->
+<div class="status-bar">
+  <div class="wrap">
+    <div class="status-item"><div class="status-dot grey" id="dotServer"></div><span id="txtServer">Connecting to server...</span></div>
+    <div class="status-item"><div class="status-dot grey" id="dotOptical"></div><span>Model A: Optical</span></div>
+    <div class="status-item"><div class="status-dot grey" id="dotSar"></div><span>Model B: SAR</span></div>
+    <div class="status-item"><div class="status-dot grey" id="dotFusion"></div><span>Model C: Fusion</span></div>
+    <div class="status-item" id="deviceInfo" style="margin-left:auto;font-size:11px;color:var(--muted)"></div>
+  </div>
+</div>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-label">🛰️ Multimodal Remote Sensing</div>
+      <h1>Land Use Classification<br>via Deep Learning</h1>
+      <p>Classifying satellite imagery into 10 land-use categories using SAR + Optical feature fusion with ResNet-18 on the EuroSAT dataset.</p>
+      <div class="stats-strip">
+        <div class="stat-item"><div class="stat-val">1,000</div><div class="stat-label">Patches</div></div>
+        <div class="stat-item"><div class="stat-val">10</div><div class="stat-label">Classes</div></div>
+        <div class="stat-item"><div class="stat-val">3</div><div class="stat-label">Models</div></div>
+        <div class="stat-item"><div class="stat-val">64px</div><div class="stat-label">Patch Size</div></div>
+        <div class="stat-item"><div class="stat-val">ResNet-18</div><div class="stat-label">Backbone</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+
+    <!-- MODEL CARDS -->
+    <div class="section-title">Model Performance</div>
+    <div class="models-grid">
+      <div class="model-card optical" onclick="selectModelCard('optical',this)">
+        <div class="model-letter">MODEL A</div>
+        <div class="model-name">Optical Only</div>
+        <div class="model-input">Input: RGB (B4, B3, B2)</div>
+        <div class="model-metric"><div class="metric-label">Accuracy</div><div class="metric-val blue">~83%</div></div>
+        <div class="model-metric"><div class="metric-label">F1-Score</div><div class="metric-val blue">~82%</div></div>
+        <div class="model-metric"><div class="metric-label">Params</div><div class="metric-val blue">11.2M</div></div>
+        <div class="acc-bar-wrap"><div class="acc-bar-fill" style="--target-w:83%;background:var(--accent)"></div></div>
+      </div>
+      <div class="model-card sar" onclick="selectModelCard('sar',this)">
+        <div class="model-letter">MODEL B</div>
+        <div class="model-name">SAR Only</div>
+        <div class="model-input">Input: NIR/SWIR (B8, B11, B12)</div>
+        <div class="model-metric"><div class="metric-label">Accuracy</div><div class="metric-val orange">~76%</div></div>
+        <div class="model-metric"><div class="metric-label">F1-Score</div><div class="metric-val orange">~75%</div></div>
+        <div class="model-metric"><div class="metric-label">Params</div><div class="metric-val orange">11.2M</div></div>
+        <div class="acc-bar-wrap"><div class="acc-bar-fill" style="--target-w:76%;background:var(--accent2)"></div></div>
+      </div>
+      <div class="model-card fusion selected" onclick="selectModelCard('fusion',this)">
+        <div class="best-badge">★ Best</div>
+        <div class="model-letter">MODEL C</div>
+        <div class="model-name">Fusion (SAR + Optical)</div>
+        <div class="model-input">Input: RGB + NIR/SWIR</div>
+        <div class="model-metric"><div class="metric-label">Accuracy</div><div class="metric-val green">~89%</div></div>
+        <div class="model-metric"><div class="metric-label">F1-Score</div><div class="metric-val green">~88%</div></div>
+        <div class="model-metric"><div class="metric-label">Params</div><div class="metric-val green">22.5M</div></div>
+        <div class="acc-bar-wrap"><div class="acc-bar-fill" style="--target-w:89%;background:var(--accent3)"></div></div>
+      </div>
+    </div>
+
+    <!-- CLASSES -->
+    <div class="section-title">Land Use Classes</div>
+    <div class="classes-grid">
+      <div class="class-card"><div class="class-emoji">🌾</div><div class="class-name">AnnualCrop</div><div class="class-desc">Seasonal agricultural fields</div></div>
+      <div class="class-card"><div class="class-emoji">🌲</div><div class="class-name">Forest</div><div class="class-desc">Dense tree cover</div></div>
+      <div class="class-card"><div class="class-emoji">🌿</div><div class="class-name">Herbaceous Veg.</div><div class="class-desc">Grasslands & shrubs</div></div>
+      <div class="class-card"><div class="class-emoji">🛣️</div><div class="class-name">Highway</div><div class="class-desc">Roads & highways</div></div>
+      <div class="class-card"><div class="class-emoji">🏭</div><div class="class-name">Industrial</div><div class="class-desc">Factories & warehouses</div></div>
+      <div class="class-card"><div class="class-emoji">🐄</div><div class="class-name">Pasture</div><div class="class-desc">Open grazing land</div></div>
+      <div class="class-card"><div class="class-emoji">🍇</div><div class="class-name">PermanentCrop</div><div class="class-desc">Orchards & vineyards</div></div>
+      <div class="class-card"><div class="class-emoji">🏘️</div><div class="class-name">Residential</div><div class="class-desc">Urban housing areas</div></div>
+      <div class="class-card"><div class="class-emoji">🏞️</div><div class="class-name">River</div><div class="class-desc">Water bodies – rivers</div></div>
+      <div class="class-card"><div class="class-emoji">🌊</div><div class="class-name">SeaLake</div><div class="class-desc">Sea and lake water</div></div>
+    </div>
+
+    <!-- CLASSIFIER -->
+    <div class="section-title">Live Classifier — Real PyTorch Model Inference</div>
+    <div class="classifier-section">
+      <div class="classifier-box">
+        <div class="clf-header">
+          <span>▶</span> POST /api/classify — Flask + PyTorch Backend
+        </div>
+        <div class="clf-body">
+          <div class="upload-area" id="uploadArea">
+            <input type="file" id="fileInput" accept="image/*">
+            <div class="upload-icon">🛰️</div>
+            <div class="upload-text">Drop a satellite image patch here</div>
+            <div class="upload-sub">or click to browse · PNG, JPG · 64×64 recommended</div>
+          </div>
+          <div class="img-preview-wrap" id="imgPreviewWrap">
+            <img id="imgPreview" class="img-preview" src="" alt="Preview">
+            <div class="img-info">
+              <b id="imgName">—</b>
+              <span id="imgSize">—</span>
+            </div>
+          </div>
+
+          <div class="model-select-row">
+            <button class="model-btn" data-model="optical" onclick="selectModelBtn('optical',this)">Model A · Optical</button>
+            <button class="model-btn" data-model="sar"     onclick="selectModelBtn('sar',this)">Model B · SAR</button>
+            <button class="model-btn active" data-model="fusion" onclick="selectModelBtn('fusion',this)">Model C · Fusion ★</button>
+          </div>
+
+          <button class="classify-btn" id="classifyBtn" onclick="classifyImage()" disabled>CLASSIFY IMAGE</button>
+
+          <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <span id="loadingText">Running PyTorch inference...</span>
+          </div>
+          <div class="error-msg" id="errorMsg"></div>
+
+          <div class="result-panel" id="resultPanel">
+            <div class="result-top">
+              <div>
+                <div class="result-class" id="resultClass">—</div>
+                <div class="result-desc"  id="resultDesc">—</div>
+              </div>
+              <div class="result-conf">
+                <div class="result-conf-val"   id="resultConf">—</div>
+                <div class="result-conf-label">confidence</div>
+              </div>
+            </div>
+            <div class="result-meta" id="resultMeta">—</div>
+            <div class="result-bars" id="resultBars"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="section-title">Training Pipeline</div>
+    <div class="arch-box">
+      <div class="pipeline">
+        <div class="pipeline-step"><div class="step-icon">📡</div><div class="step-name">EuroSAT</div><div class="step-detail">Sentinel-2</div></div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step"><div class="step-icon">🔀</div><div class="step-name">Sampling</div><div class="step-detail">100/class</div></div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step"><div class="step-icon">✂️</div><div class="step-name">Split</div><div class="step-detail">60/20/20</div></div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step"><div class="step-icon">🔄</div><div class="step-name">Augment</div><div class="step-detail">Flip+Jitter</div></div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step"><div class="step-icon">🧠</div><div class="step-name">ResNet-18</div><div class="step-detail">ImageNet</div></div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step"><div class="step-icon">🔗</div><div class="step-name">Fusion</div><div class="step-detail">512+512</div></div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step"><div class="step-icon">📊</div><div class="step-name">Evaluate</div><div class="step-detail">Acc, F1, CM</div></div>
+      </div>
+      <div class="arch-meta">
+        <div class="arch-meta-item"><h4>Optimizer</h4><p>Adam · LR 5e-4</p><small>Weight Decay: 1e-4</small></div>
+        <div class="arch-meta-item"><h4>Scheduler</h4><p>Cosine Annealing</p><small>T_max=60, η_min=1e-6</small></div>
+        <div class="arch-meta-item"><h4>Early Stopping</h4><p>Patience: 12</p><small>Best weights restored</small></div>
+      </div>
+    </div>
+
+    <!-- INFO -->
+    <div class="info-row">
+      <div class="info-card">
+        <h3>Key Findings</h3>
+        <ul class="info-list">
+          <li>Fusion model outperforms both single-modality models by combining spectral + structural cues</li>
+          <li>Optical excels on vegetated classes — rich spectral signatures</li>
+          <li>SAR bands better distinguish structural classes (Industrial, Residential, Highway)</li>
+          <li>AnnualCrop ↔ PermanentCrop and Herbaceous ↔ Pasture are the hardest pairs</li>
+          <li>ImageNet transfer learning provides strong initialization for satellite imagery</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h3>Dataset & Setup</h3>
+        <ul class="info-list">
+          <li>EuroSAT: Sentinel-2 multispectral patches (64×64 px), 10 classes</li>
+          <li>Optical: Bands B4, B3, B2 (True color RGB)</li>
+          <li>SAR-simulated: Bands B8 (NIR), B11, B12 (SWIR)</li>
+          <li>Balanced: 100 patches × 10 classes = 1,000 total</li>
+          <li>Split: 60% train · 20% val · 20% test (stratified)</li>
+          <li>Batch size: 32 · Max 60 epochs per model</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-text">
+      Multimodal Remote Sensing Land Classification — EuroSAT + ResNet-18<br>
+      AIML · 2025 &nbsp;·&nbsp;
+      <a href="https://github.com/phelber/EuroSAT" target="_blank">EuroSAT Dataset</a> &nbsp;·&nbsp;
+      <a href="https://torchgeo.readthedocs.io" target="_blank">TorchGeo</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const CLASS_NAMES  = ['AnnualCrop','Forest','HerbaceousVegetation','Highway','Industrial','Pasture','PermanentCrop','Residential','River','SeaLake'];
+  const CLASS_EMOJIS = ['🌾','🌲','🌿','🛣️','🏭','🐄','🍇','🏘️','🏞️','🌊'];
+  let selectedModel = 'fusion';
+  let uploadedFile  = null;
+
+  // ── Server status ──────────────────────────────────────────────────────────
+  async function checkStatus() {
+    try {
+      const r = await fetch('/api/status');
+      const d = await r.json();
+      setDot('dotServer',  true);
+      setDot('dotOptical', d.models?.optical);
+      setDot('dotSar',     d.models?.sar);
+      setDot('dotFusion',  d.models?.fusion);
+      document.getElementById('txtServer').textContent = 'Flask server online';
+      document.getElementById('deviceInfo').textContent = '⚙ ' + (d.device || '');
+    } catch {
+      setDot('dotServer', false);
+      document.getElementById('txtServer').textContent = 'Server offline — run: python app.py';
+    }
+  }
+  function setDot(id, ok) {
+    document.getElementById(id).className = 'status-dot ' + (ok ? 'green' : 'red');
+  }
+  checkStatus();
+  setInterval(checkStatus, 15000);
+
+  // ── Model selectors ────────────────────────────────────────────────────────
+  function selectModelBtn(name, btn) {
+    document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedModel = name;
+  }
+  function selectModelCard(name, card) {
+    document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    document.querySelectorAll('.model-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.model === name);
+    });
+    selectedModel = name;
+  }
+
+  // ── Upload ─────────────────────────────────────────────────────────────────
+  const uploadArea = document.getElementById('uploadArea');
+  const fileInput  = document.getElementById('fileInput');
+  uploadArea.addEventListener('click', () => fileInput.click());
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault(); uploadArea.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  function handleFile(file) {
+    uploadedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('imgPreview').src = e.target.result;
+      document.getElementById('imgName').textContent = file.name;
+      document.getElementById('imgSize').textContent = (file.size/1024).toFixed(1) + ' KB · ' + file.type;
+      document.getElementById('imgPreviewWrap').classList.add('show');
+      document.getElementById('classifyBtn').disabled = false;
+      document.getElementById('resultPanel').classList.remove('show');
+      document.getElementById('errorMsg').classList.remove('show');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Classify → calls Flask /api/classify ──────────────────────────────────
+  async function classifyImage() {
+    if (!uploadedFile) return;
+    const loading   = document.getElementById('loading');
+    const resultPanel = document.getElementById('resultPanel');
+    const errorMsg  = document.getElementById('errorMsg');
+    const btn       = document.getElementById('classifyBtn');
+
+    loading.classList.add('show');
+    resultPanel.classList.remove('show');
+    errorMsg.classList.remove('show');
+    btn.disabled = true;
+    document.getElementById('loadingText').textContent = `Running ${selectedModel} model inference...`;
+
+    try {
+      const fd = new FormData();
+      fd.append('image', uploadedFile);
+      fd.append('model', selectedModel);
+
+      const res = await fetch('/api/classify', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error + (data.hint ? '\n' + data.hint : ''));
+      showResult(data);
+    } catch (err) {
+      document.getElementById('errorMsg').textContent = '⚠ ' + (err.message || 'Inference failed.');
+      document.getElementById('errorMsg').classList.add('show');
+    } finally {
+      loading.classList.remove('show');
+      btn.disabled = false;
+    }
+  }
+
+  function showResult(r) {
+    const idx  = CLASS_NAMES.indexOf(r.prediction);
+    const em   = idx >= 0 ? CLASS_EMOJIS[idx] : '🛰️';
+    const labels = { optical:'Model A (Optical)', sar:'Model B (SAR)', fusion:'Model C (Fusion)' };
+
+    document.getElementById('resultClass').textContent = `${em} ${r.prediction}`;
+    document.getElementById('resultDesc').textContent  = r.description || '';
+    document.getElementById('resultConf').textContent  = (r.confidence * 100).toFixed(1) + '%';
+    document.getElementById('resultMeta').textContent  =
+      `Model: ${labels[r.model_type] || r.model_type}  ·  Device: ${r.device}  ·  PyTorch inference`;
+
+    const sorted = Object.entries(r.probabilities || {}).sort((a,b) => b[1]-a[1]);
+    document.getElementById('resultBars').innerHTML = sorted.map(([name, prob]) => {
+      const pct  = (prob * 100).toFixed(1);
+      const top  = name === r.prediction;
+      const ei   = CLASS_NAMES.indexOf(name);
+      return `
+        <div class="result-bar-row">
+          <div class="rbl ${top?'top':''}">${CLASS_EMOJIS[ei]||'·'} ${name}</div>
+          <div class="rbt"><div class="rbf ${top?'top':''}" style="width:${pct}%"></div></div>
+          <div class="rbp ${top?'top':''}">${pct}%</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('resultPanel').classList.add('show');
+  }
+</script>
+</body>
+</html>
