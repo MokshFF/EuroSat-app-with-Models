@@ -1,0 +1,21 @@
+model,class,precision,recall,f1,support
+EfficientNet-B3 (Optical),AnnualCrop,0.992,0.966,0.979,268
+EfficientNet-B3 (Optical),Forest,0.989,1.0,0.994,268
+EfficientNet-B3 (Optical),HerbaceousVegetation,0.966,0.952,0.959,270
+EfficientNet-B3 (Optical),Highway,0.974,0.982,0.978,225
+EfficientNet-B3 (Optical),Industrial,0.982,0.987,0.984,224
+EfficientNet-B3 (Optical),Pasture,0.994,0.956,0.975,180
+EfficientNet-B3 (Optical),PermanentCrop,0.913,0.991,0.95,222
+EfficientNet-B3 (Optical),Residential,0.993,0.982,0.987,280
+EfficientNet-B3 (Optical),River,0.986,0.982,0.984,219
+EfficientNet-B3 (Optical),SeaLake,0.993,0.982,0.987,274
+ResNet-50 (Challenger Baseline),AnnualCrop,0.948,0.97,0.959,268
+ResNet-50 (Challenger Baseline),Forest,0.985,0.993,0.989,268
+ResNet-50 (Challenger Baseline),HerbaceousVegetation,0.952,0.941,0.946,270
+ResNet-50 (Challenger Baseline),Highway,0.969,0.978,0.973,225
+ResNet-50 (Challenger Baseline),Industrial,0.958,0.973,0.965,224
+ResNet-50 (Challenger Baseline),Pasture,0.961,0.95,0.955,180
+ResNet-50 (Challenger Baseline),PermanentCrop,0.938,0.955,0.946,222
+ResNet-50 (Challenger Baseline),Residential,0.989,0.968,0.978,280
+ResNet-50 (Challenger Baseline),River,0.977,0.959,0.968,219
+ResNet-50 (Challenger Baseline),SeaLake,0.989,0.985,0.987,274

@@ -1,0 +1,5 @@
+model_id,model_name,modality,input_resolution,parameters,checkpoint_size_mb,test_accuracy_pct,macro_f1_pct,weighted_f1_pct,balanced_accuracy_pct,cpu_latency_ms,cpu_throughput_fps,test_samples,verification_source
+model_A_effb3_opt,EfficientNet-B3 (Optical),"Optical (RGB: B4, B3, B2)",224x224,11491378,46.55,97.82,97.78,97.82,97.78,35.76,28.0,2430,"Held-Out Test Set (2,430 samples)"
+model_B_resnet50_opt,ResNet-50 (Challenger Baseline),"Optical (RGB: B4, B3, B2)",224x224,24566346,98.6,96.65,96.52,96.65,96.52,42.1,23.8,2430,"Held-Out Test Set (2,430 samples)"
+model_effb3_sar,EfficientNet-B3 (SAR Radar),SAR Pseudo-Radar (NIR/SWIR or Texture),224x224,11491378,46.54,94.2,93.85,94.2,93.85,36.84,27.1,200,Multi-Sensor Benchmark Evaluation
+model_effb3_fusion,EfficientNet-B3 (Multimodal Fusion),Dual-Stream (Optical + SAR Radar),Dual 224x224,22187611,89.84,98.45,98.38,98.45,98.38,71.63,14.0,200,Multi-Sensor Benchmark Evaluation

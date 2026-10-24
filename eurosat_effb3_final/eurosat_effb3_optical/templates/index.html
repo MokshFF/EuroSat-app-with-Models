@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EuroSAT Intelligence Portal — Optical & SAR Multimodal Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a0e;
+    --surface: #0c1520;
+    --surface2: #111d2b;
+    --surface3: #162638;
+    --border: #1e3048;
+    --border-highlight: #2c496e;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7cff6b;
+    --radar: #ffaa00;
+    --fusion: #c084fc;
+    --gold: #ffd166;
+    --text: #e8f4ff;
+    --muted: #6b8fae;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; overflow-x: hidden; cursor: none; }
+
+  /* CUSTOM CURSOR */
+  #cursor-dot  { position: fixed; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; pointer-events: none; z-index: 9999; transform: translate(-50%,-50%); box-shadow: 0 0 10px var(--accent), 0 0 30px rgba(0,212,255,.4); transition: transform .1s; }
+  #cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(0,212,255,.5); border-radius: 50%; pointer-events: none; z-index: 9998; transform: translate(-50%,-50%); transition: width .25s, height .25s, border-color .25s; }
+  .cursor-grow #cursor-ring { width: 56px !important; height: 56px !important; border-color: var(--accent) !important; }
+
+  /* PARTICLE CANVAS & BACKGROUND */
+  #particle-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,212,255,.02) 1px,transparent 1px), linear-gradient(90deg,rgba(0,212,255,.02) 1px,transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+    animation: gridPulse 8s ease-in-out infinite;
+  }
+  @keyframes gridPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  body::after { content:''; position:fixed; inset:0; z-index:1; pointer-events:none; background: linear-gradient(transparent 50%, rgba(0,0,0,.02) 50%); background-size: 100% 4px; }
+
+  .wrap { position: relative; z-index: 2; max-width: 1260px; margin: 0 auto; padding: 0 24px; }
+
+  /* HEADER & STATUS BAR */
+  header { border-bottom: 1px solid var(--border); padding: 18px 0; background: rgba(5,10,14,.93); backdrop-filter: blur(12px); z-index: 100; position: sticky; top: 0; }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .logo { font-family: 'Space Mono',monospace; font-size: 13px; color: var(--accent); letter-spacing: .1em; display: flex; align-items: center; gap: 10px; text-shadow: 0 0 15px rgba(0,212,255,.4); }
+  .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.6)} 50%{box-shadow:0 0 0 8px rgba(0,212,255,0)} }
+  .header-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge { font-family: 'IBM Plex Mono',monospace; font-size: 10px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 4px 10px; border-radius: 3px; }
+  .badge-opt { background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.4); color: var(--accent); font-weight: 600; }
+  .badge-sar { background: rgba(255,170,0,0.1); border-color: rgba(255,170,0,0.4); color: var(--radar); font-weight: 600; }
+  .badge-fusion { background: rgba(192,132,252,0.12); border-color: rgba(192,132,252,0.4); color: var(--fusion); font-weight: 700; }
+
+  .status-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 0; }
+  .status-bar .wrap { display: flex; align-items: center; gap: 20px; font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; transition: background .3s; }
+  .status-dot.green { background: var(--accent3); animation: pulseGreen 2s infinite; }
+  @keyframes pulseGreen { 0%,100%{box-shadow:0 0 6px rgba(124,255,107,.7)} 50%{box-shadow:0 0 16px rgba(124,255,107,1)} }
+  .status-dot.red { background: var(--accent2); box-shadow: 0 0 6px rgba(255,107,53,.5); }
+  .status-item { display: flex; align-items: center; gap: 6px; }
+
+  /* HERO */
+  .hero { padding: 36px 0 20px; text-align: center; }
+  .hero-label { font-family: 'IBM Plex Mono',monospace; font-size: 11px; letter-spacing: .25em; color: var(--accent); text-transform: uppercase; margin-bottom: 12px; display: inline-block; border: 1px solid rgba(0,212,255,.3); padding: 4px 14px; border-radius: 2px; }
+  .hero h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); font-weight: 800; line-height: 1.15; margin-bottom: 10px; background: linear-gradient(135deg,#fff 30%,var(--accent) 70%, var(--fusion) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p { font-size: 13.5px; color: var(--muted); max-width: 780px; margin: 0 auto; line-height: 1.6; }
+
+  /* TABS SYSTEM (2 TABS) */
+  .tab-container { display: flex; justify-content: center; gap: 12px; margin-bottom: 25px; margin-top: 10px; flex-wrap: wrap; }
+  .tab-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; padding: 12px 24px; border-radius: 4px; cursor: none; transition: all .3s; display: flex; align-items: center; gap: 8px; }
+  .tab-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,.06); box-shadow: 0 0 15px rgba(0,212,255,.2); }
+  .tab-btn:hover:not(.active) { border-color: var(--border-highlight); color: var(--text); }
+  .tab-pane { display: none; animation: fadeIn 0.4s ease; }
+  .tab-pane.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 11px; font-family: 'IBM Plex Mono',monospace; color: var(--accent); letter-spacing: .2em; text-transform: uppercase; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg,var(--border),transparent); }
+
+  /* SIDE-BY-SIDE MAIN CONTAINER (TAB 1) */
+  .grid-layout { display: grid; grid-template-columns: 340px 1fr; gap: 24px; margin-bottom: 50px; }
+
+  /* SIDEBAR / CONTROLS PANEL */
+  .controls-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+  .control-section-title { font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; color: var(--accent); letter-spacing: .15em; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  
+  /* MODALITY SELECTOR (OPTICAL / SAR / FUSION) */
+  .modality-selector { display: flex; flex-direction: column; gap: 8px; }
+  .mod-opt { background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; padding: 10px 12px; cursor: none; transition: all .3s; display: flex; justify-content: space-between; align-items: center; position: relative; }
+  .mod-opt:hover { border-color: var(--border-highlight); }
+  .mod-opt.selected { border-color: var(--accent); background: rgba(0,212,255,.05); }
+  .mod-opt.selected.opt-mode { border-color: var(--accent); background: rgba(0,212,255,.07); }
+  .mod-opt.selected.sar-mode { border-color: var(--radar); background: rgba(255,170,0,.07); }
+  .mod-opt.selected.fusion-mode { border-color: var(--fusion); background: rgba(192,132,252,.08); box-shadow: 0 0 12px rgba(192,132,252,.15); }
+  .mod-name { font-size: 11.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .mod-sub { font-size: 9px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); margin-top: 2px; }
+  
+  .tag-mini { font-family: 'IBM Plex Mono', monospace; font-size: 8px; padding: 2px 5px; border-radius: 2px; text-transform: uppercase; }
+  .tag-mini.green { background: rgba(124,255,107,0.15); color: var(--accent3); border: 1px solid rgba(124,255,107,0.4); }
+  .tag-mini.blue { background: rgba(0,212,255,0.15); color: var(--accent); border: 1px solid rgba(0,212,255,0.3); }
+  .tag-mini.radar { background: rgba(255,170,0,0.15); color: var(--radar); border: 1px solid rgba(255,170,0,0.3); }
+  .tag-mini.fusion { background: rgba(192,132,252,0.2); color: var(--fusion); border: 1px solid rgba(192,132,252,0.4); }
+
+  /* UPLOAD DRAG BOXES */
+  .upload-area { border: 2px dashed var(--border); border-radius: 4px; padding: 20px 10px; text-align: center; cursor: pointer; transition: all .3s; position: relative; }
+  .upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: rgba(0,212,255,.02); }
+  .upload-area.sar-upload:hover { border-color: var(--radar); background: rgba(255,170,0,.02); }
+  #fileInputPatch, #fileInputSAR, #fileInputDuel { display: none; }
+  .upload-icon { font-size: 24px; margin-bottom: 6px; display:block; }
+  .upload-text { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .upload-sub { font-size: 9px; font-family: 'IBM Plex Mono',monospace; color: var(--muted); opacity: .7; margin-top: 3px; }
+
+  /* DYNAMIC PREVIEW PANELS */
+  .img-preview-box { display: none; border: 1px solid var(--border); border-radius: 4px; background: var(--surface2); padding: 8px 10px; gap: 10px; align-items: center; }
+  .img-preview-box.show { display: flex; }
+  .img-preview-thumbnail { width: 42px; height: 42px; border-radius: 3px; border: 1px solid var(--accent); object-fit: cover; }
+  .img-preview-details { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); overflow: hidden; flex: 1; }
+  .img-preview-details span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* BUTTONS */
+  .action-btn { width: 100%; padding: 12px; background: var(--accent); color: var(--bg); border: none; font-family: 'Syne',sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: none; border-radius: 3px; transition: all .25s; }
+  .action-btn:not(:disabled):hover { background: #22e0ff; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,212,255,.4); }
+  .action-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .action-btn.btn-fusion { background: var(--fusion); color: #0f0728; }
+  .action-btn.btn-fusion:not(:disabled):hover { background: #d8b4fe; box-shadow: 0 4px 15px rgba(192,132,252,.4); }
+
+  /* MAIN INFERENCE CONTAINER */
+  .display-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
+  .display-header { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--muted); flex-wrap: wrap; gap: 8px; }
+  .display-header span.tag { color: var(--accent); }
+  .display-body { padding: 24px; position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+
+  /* PROMPT / PLACEHOLDER SCREEN */
+  .prompt-screen { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .prompt-icon { font-size: 44px; color: var(--border); margin-bottom: 8px; }
+  .prompt-text { font-size: 14px; margin-bottom: 5px; }
+  .prompt-sub { font-size: 11px; font-family: 'IBM Plex Mono', monospace; }
+
+  /* RESULTS PANEL */
+  .patch-result-grid { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
+  
+  /* IMAGE VIEWER SWAP CONTAINER */
+  .image-viewer { display: flex; flex-direction: column; gap: 12px; }
+  .image-viewport { width: 100%; aspect-ratio: 1; border-radius: 4px; border: 1px solid var(--border); overflow: hidden; position: relative; background: #000; }
+  .image-viewport img { width: 100%; height: 100%; object-fit: cover; }
+  .gradcam-toggle-container { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; }
+  .toggle-label { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--muted); }
+  
+  /* SWITCH SLIDER UI */
+  .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-switch { position: absolute; cursor: none; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .4s; border-radius: 34px; }
+  .slider-switch:before { position: absolute; content: ""; height: 14px; width: 14px; left: 4px; bottom: 4px; background-color: var(--text); transition: .4s; border-radius: 50%; }
+  input:checked + .slider-switch { background-color: var(--accent); }
+  input:checked + .slider-switch:before { transform: translateX(20px); background-color: var(--bg); }
+
+  /* PROBABILITIES BARS */
+  .prob-header-block { display: flex; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px; }
+  .class-headline { font-size: 20px; font-weight: 800; color: var(--accent); text-shadow: 0 0 20px rgba(0,212,255,.4); }
+  .class-details { font-size: 11px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; margin-top: 3px; }
+  .conf-headline-val { font-family: 'Space Mono', monospace; font-size: 22px; font-weight: 700; color: var(--accent3); text-shadow: 0 0 15px rgba(124,255,107,.4); text-align: right; }
+  .conf-headline-lbl { font-size: 9px; color: var(--muted); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; text-align: right; }
+  .prob-list { display: flex; flex-direction: column; gap: 7px; }
+  .prob-row { display: flex; align-items: center; gap: 10px; }
+  .pr-label { font-size: 10.5px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); width: 140px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pr-label.highlight { color: var(--text); font-weight: 500; }
+  .pr-bar-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
+  .pr-bar-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
+  .pr-bar-fill.highlight { background: linear-gradient(90deg, var(--accent), var(--accent3)); }
+  .pr-val { font-family: 'Space Mono', monospace; font-size: 10.5px; color: var(--muted); width: 44px; text-align: right; flex-shrink: 0; }
+  .pr-val.highlight { color: var(--accent3); font-weight: 700; }
+
+  /* MULTIMODAL DUAL VIEWER */
+  .fusion-view-selector { display: flex; gap: 6px; margin-top: 6px; }
+  .fusion-btn-sm { flex: 1; padding: 6px 8px; font-size: 9.5px; font-family: 'IBM Plex Mono', monospace; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); border-radius: 3px; cursor: none; text-align: center; }
+  .fusion-btn-sm.active { background: rgba(192,132,252,0.15); border-color: var(--fusion); color: var(--fusion); font-weight: 700; }
+
+  /* TAB 2: MULTI-SENSOR BENCHMARK MATRIX */
+  .duel-container { display: flex; flex-direction: column; gap: 24px; }
+  .duel-input-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 24px; text-align: center; }
+  
+  /* 4-COLUMN CARDS LAYOUT FOR ALL MODELS */
+  .multi-bench-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 20px; }
+  .bench-col { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .bench-col.winner-col { border-color: var(--fusion); box-shadow: 0 0 15px rgba(192,132,252,.1); }
+  .bench-col-header { border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .bench-col-title { font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: space-between; }
+  .bench-col-modality { font-size: 9.5px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); margin-top: 2px; }
+  .bench-img-box { width: 100%; aspect-ratio: 1; border-radius: 3px; border: 1px solid var(--border); overflow: hidden; background: #000; }
+  .bench-img-box img { width: 100%; height: 100%; object-fit: cover; }
+  .bench-pred-title { font-size: 15px; font-weight: 800; color: var(--accent); }
+  .bench-conf-val { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; color: var(--accent3); }
+  .bench-latency { font-size: 9.5px; font-family: 'IBM Plex Mono', monospace; color: var(--muted); }
+
+  /* SPEC MATRIX TABLE */
+  .matrix-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 24px; margin-top: 15px; overflow-x: auto; }
+  .matrix-table { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  .matrix-table th { background: var(--surface2); color: var(--accent); padding: 12px 14px; text-align: left; border: 1px solid var(--border); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  .matrix-table td { padding: 11px 14px; border: 1px solid var(--border); color: var(--text); }
+  .matrix-table tr:hover td { background: rgba(0,212,255,.02); }
+  .winner-cell { color: var(--accent3) !important; font-weight: 700; }
+  .fusion-cell { color: var(--fusion) !important; font-weight: 700; }
+  .radar-cell { color: var(--radar) !important; }
+
+  /* TAKEAWAY CARDS */
+  .takeaways-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 15px; }
+  .takeaway-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 16px; }
+  .takeaway-num { font-family: 'Space Mono',monospace; font-size: 10px; color: var(--accent); margin-bottom: 6px; }
+  .takeaway-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .takeaway-desc { font-size: 10.5px; color: var(--muted); line-height: 1.5; font-family: 'IBM Plex Mono', monospace; }
+
+  /* GRID OF LAND USE CLASSES */
+  .classes-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 35px; }
+  .class-card { background: var(--surface); border: 1px solid var(--border); padding: 10px; border-radius: 4px; text-align: center; }
+  .class-emoji { font-size: 20px; margin-bottom: 4px; display:block; }
+  .class-name { font-size: 10.5px; font-weight: 700; margin-bottom: 2px; }
+  .class-desc { font-size: 9px; color: var(--muted); font-family: 'IBM Plex Mono',monospace; line-height: 1.3; }
+
+  /* FOOTER */
+  footer { border-top: 1px solid var(--border); padding: 25px 0; background: var(--surface); margin-top: 40px; }
+  .footer-text { font-family: 'IBM Plex Mono',monospace; font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.8; }
+
+  /* LOADING SPINNER */
+  .loading-overlay { position: absolute; inset: 0; background: rgba(5,10,14,.85); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; z-index: 10; }
+  .loading-overlay.show { display: flex; }
+  .spinner { width: 34px; height: 34px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--accent); }
+
+  .error-block { display: none; background: rgba(255,107,53,0.1); border: 1px solid var(--accent2); color: #ff9d79; padding: 12px; border-radius: 3px; font-size: 11.5px; font-family: 'IBM Plex Mono', monospace; margin-top: 10px; }
+  .error-block.show { display: block; }
+
+  @media (max-width: 1024px) {
+    .grid-layout { grid-template-columns: 1fr; }
+    .patch-result-grid { grid-template-columns: 1fr; }
+    .multi-bench-grid { grid-template-columns: 1fr 1fr; }
+    .classes-grid { grid-template-columns: repeat(3, 1fr); }
+    .takeaways-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="cursor-dot"></div>
+<div id="cursor-ring"></div>
+<canvas id="particle-canvas"></canvas>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <div class="wrap">
+    <div class="status-item"><div class="status-dot green" id="dotServer"></div><span id="txtServer">Flask Backend Online</span></div>
+    <div class="status-item"><div class="status-dot green" id="dotModelA"></div><span>EfficientNet-B3 Optical (97.82%)</span></div>
+    <div class="status-item"><div class="status-dot green" id="dotModelSAR"></div><span>EfficientNet-B3 SAR Radar (94.20%)</span></div>
+    <div class="status-item"><div class="status-dot green" id="dotModelFusion"></div><span>EfficientNet-B3 Fusion (98.45%)</span></div>
+    <div class="status-item"><div class="status-dot green" id="dotModelB"></div><span>ResNet-50 Challenger (96.65%)</span></div>
+    <div style="margin-left:auto;" id="deviceInfo">⚙ CUDA / CPU</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="wrap">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      EUROSAT MULTIMODAL INTELLIGENCE · OPTICAL & SAR RADAR
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-opt">🛰️ OPTICAL S2</span>
+      <span class="badge badge-sar">📡 SAR RADAR S1</span>
+      <span class="badge badge-fusion">🚀 MULTIMODAL SOTA (98.45%)</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-label">MULTIMODAL SATELLITE EARTH OBSERVATION ENGINE</div>
+    <h1>EuroSAT Optical & SAR Radar Classifier</h1>
+    <p>
+      Advanced deep learning suite featuring <strong>EfficientNet-B3</strong> across Sentinel-2 Optical RGB and Sentinel-1 SAR Radar imagery. Includes dual-stream multimodal feature fusion (3072-dim) and explainable AI Grad-CAM heatmaps.
+    </p>
+  </div>
+
+  <!-- NAVIGATION TABS -->
+  <div class="tab-container">
+    <button class="tab-btn active" id="btnTabPatch" onclick="switchTab('patch')">
+      🛰️ Satellite Classifier & Grad-CAM
+    </button>
+    <button class="tab-btn" id="btnTabCompare" onclick="switchTab('compare')">
+      📊 Multi-Sensor Benchmark & Head-to-Head
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       TAB 1: SATELLITE CLASSIFIER & GRAD-CAM
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="mainGridLayout" class="grid-layout">
+    
+    <!-- CONTROLS SIDEBAR -->
+    <div class="controls-card">
+      <div class="control-section-title">01 / SELECT SENSOR & MODEL</div>
+      
+      <div class="modality-selector">
+        <!-- Optical Mode -->
+        <div class="mod-opt opt-mode selected" id="optModeOptical" onclick="selectModality('optical')">
+          <div>
+            <div class="mod-name">🛰️ Optical RGB (Sentinel-2)</div>
+            <div class="mod-sub">EfficientNet-B3 · 12.2M Params · 1536-dim</div>
+          </div>
+          <span class="tag-mini blue">97.82%</span>
+        </div>
+
+        <!-- SAR Radar Mode -->
+        <div class="mod-opt sar-mode" id="optModeSAR" onclick="selectModality('sar')">
+          <div>
+            <div class="mod-name">📡 SAR Radar Backscatter (Sentinel-1)</div>
+            <div class="mod-sub">EfficientNet-B3 · Texture & Roughness</div>
+          </div>
+          <span class="tag-mini radar">94.20%</span>
+        </div>
+
+        <!-- Multimodal Fusion Mode -->
+        <div class="mod-opt fusion-mode" id="optModeFusion" onclick="selectModality('fusion')">
+          <div>
+            <div class="mod-name">🚀 Multimodal Fusion (Optical + SAR)</div>
+            <div class="mod-sub">Dual-Stream EffNet-B3 · 3072-dim Head</div>
+          </div>
+          <span class="tag-mini fusion">98.45% SOTA</span>
+        </div>
+
+        <!-- ResNet-50 Challenger Baseline -->
+        <div class="mod-opt" id="optModeResNet" onclick="selectModality('resnet50')">
+          <div>
+            <div class="mod-name">⚖️ ResNet-50 (Challenger Baseline)</div>
+            <div class="mod-sub">24.6M Params · Bottleneck Residuals</div>
+          </div>
+          <span class="tag-mini green">96.65%</span>
+        </div>
+      </div>
+
+      <!-- UPLOAD AREA: OPTICAL / PRIMARY -->
+      <div class="control-section-title" id="titlePrimaryUpload">02 / UPLOAD OPTICAL SATELLITE PATCH</div>
+      
+      <div class="upload-area" id="uploadAreaPatch">
+        <span class="upload-icon" id="primaryUploadIcon">🛰️</span>
+        <div class="upload-text" id="primaryUploadText">Click or Drag Satellite Image</div>
+        <div class="upload-sub">Sentinel-2 RGB / Patch (PNG, JPG, TIF)</div>
+        <input type="file" id="fileInputPatch" accept="image/*">
+      </div>
+
+      <div class="img-preview-box" id="previewBoxPatch">
+        <img id="previewImgPatch" class="img-preview-thumbnail" src="" alt="Thumbnail">
+        <div class="img-preview-details">
+          <span id="previewNamePatch">—</span>
+          <span id="previewSizePatch" style="color:var(--accent);">—</span>
+        </div>
+      </div>
+
+      <!-- DUAL UPLOAD AREA: SAR RADAR (VISIBLE ONLY IN FUSION MODE) -->
+      <div id="sarUploadContainer" style="display: none; flex-direction: column; gap: 8px;">
+        <div class="control-section-title">02B / SAR RADAR PATCH (SENTINEL-1)</div>
+        <div class="upload-area sar-upload" id="uploadAreaSAR">
+          <span class="upload-icon">📡</span>
+          <div class="upload-text">Upload Radar Backscatter Image</div>
+          <div class="upload-sub">Optional: Synthesized automatically if left blank</div>
+          <input type="file" id="fileInputSAR" accept="image/*">
+        </div>
+        <div class="img-preview-box" id="previewBoxSAR">
+          <img id="previewImgSAR" class="img-preview-thumbnail" style="border-color:var(--radar);" src="" alt="Thumbnail SAR">
+          <div class="img-preview-details">
+            <span id="previewNameSAR">—</span>
+            <span id="previewSizeSAR" style="color:var(--radar);">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RUN INFERENCE BUTTON -->
+      <button class="action-btn" id="btnClassifyPatch" disabled onclick="classifyPatch()">
+        RUN SATELLITE INFERENCE
+      </button>
+
+      <div class="error-block" id="errorBlock"></div>
+    </div>
+
+    <!-- MAIN INFERENCE DISPLAY PANEL -->
+    <div class="display-card">
+      <div class="display-header">
+        <div>ACTIVE SENSOR / PIPELINE: <span class="tag" id="lblDisplayModelTag">EfficientNet-B3 (Optical RGB)</span></div>
+        <div id="lblDisplaySensorBadge" class="badge badge-opt">OPTICAL SENTINEL-2</div>
+      </div>
+
+      <div class="display-body">
+        <div class="loading-overlay" id="loadingOverlay">
+          <div class="spinner"></div>
+          <div class="loading-text" id="loadingText">Running EfficientNet-B3 inference & Grad-CAM...</div>
+        </div>
+
+        <!-- INITIAL PLACEHOLDER PROMPT -->
+        <div class="prompt-screen" id="promptPatch">
+          <div class="prompt-icon">🛰️</div>
+          <div class="prompt-text">Awaiting Satellite Patch Input</div>
+          <div class="prompt-sub">Select a sensor modality and upload an image to view predictions and Grad-CAM heatmaps.</div>
+        </div>
+
+        <!-- RESULT PANEL -->
+        <div id="panelResultPatch" style="display: none;" class="patch-result-grid">
+          
+          <!-- IMAGE VIEWER -->
+          <div class="image-viewer">
+            <div class="image-viewport">
+              <img id="viewPatch" src="" alt="Satellite Analysis">
+            </div>
+
+            <!-- Grad-CAM toggle switch -->
+            <div class="gradcam-toggle-container">
+              <span class="toggle-label">Grad-CAM Heatmap Overlay</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleGradCAM" onchange="toggleGradCAMView()">
+                <span class="slider-switch"></span>
+              </label>
+            </div>
+
+            <!-- Fusion View Stream Selector (only active in fusion mode) -->
+            <div id="fusionStreamSelector" style="display: none;">
+              <div style="font-size: 9.5px; font-family:'IBM Plex Mono', monospace; color:var(--muted); margin-bottom: 4px;">FUSED SENSOR STREAM:</div>
+              <div class="fusion-view-selector">
+                <div class="fusion-btn-sm active" id="btnStreamOpt" onclick="switchFusionStream('opt')">🛰️ Optical Attention</div>
+                <div class="fusion-btn-sm" id="btnStreamSAR" onclick="switchFusionStream('sar')">📡 SAR Radar Attention</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PROBABILITIES & CLASSIFICATION SUMMARY -->
+          <div>
+            <div class="prob-header-block">
+              <div>
+                <div class="class-headline" id="lblPatchClass">—</div>
+                <div class="class-details" id="lblPatchDesc">—</div>
+              </div>
+              <div>
+                <div class="conf-headline-val" id="lblPatchConf">—%</div>
+                <div class="conf-headline-lbl">CONFIDENCE SCORE</div>
+                <div style="font-size: 9.5px; font-family:'IBM Plex Mono', monospace; color:var(--muted); text-align:right; margin-top:2px;" id="lblPatchLatency">⚡ 0.0 ms</div>
+              </div>
+            </div>
+
+            <div class="section-title">EuroSAT 10-Class Probability Distribution</div>
+            <div class="prob-list" id="lblPatchBars"></div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       TAB 2: MULTI-SENSOR BENCHMARK & HEAD-TO-HEAD
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="paneCompare" class="tab-pane">
+    <div class="duel-container">
+      
+      <div class="duel-input-card">
+        <div class="section-title" style="justify-content: center;">Multi-Sensor Head-to-Head Duel</div>
+        <p style="font-size: 13px; color: var(--muted); margin-bottom: 18px; max-width: 650px; margin-inline: auto;">
+          Upload a satellite patch to simultaneously execute inference across <strong>EfficientNet-B3 Optical</strong>, <strong>EfficientNet-B3 SAR Radar</strong>, <strong>EfficientNet-B3 Multimodal Fusion</strong>, and <strong>ResNet-50</strong>.
+        </p>
+        
+        <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+          <button class="action-btn" style="width: auto; padding: 12px 30px;" onclick="document.getElementById('fileInputDuel').click()">
+            UPLOAD SATELLITE IMAGE
+          </button>
+          <input type="file" id="fileInputDuel" accept="image/*">
+          
+          <button class="action-btn btn-fusion" id="btnRunDuel" disabled style="width: auto; padding: 12px 30px;" onclick="runDuelInference()">
+            LAUNCH 4-ENGINE BENCHMARK DUEL
+          </button>
+        </div>
+        <div id="duelFileName" style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted); margin-top:10px;"></div>
+      </div>
+
+      <!-- 4-ENGINE BENCHMARK RESULTS CARDS -->
+      <div id="duelResultsLayout" style="display: none; position: relative;">
+        <div class="loading-overlay" id="loadingOverlayDuel">
+          <div class="spinner"></div>
+          <div class="loading-text">Executing Multi-Sensor Parallel Inference & Grad-CAM...</div>
+        </div>
+
+        <div class="multi-bench-grid">
+          
+          <!-- 1. Optical EfficientNet-B3 -->
+          <div class="bench-col">
+            <div class="bench-col-header">
+              <div class="bench-col-title">
+                <span>EfficientNet-B3</span>
+                <span class="tag-mini blue">97.82%</span>
+              </div>
+              <div class="bench-col-modality">🛰️ Optical RGB (Sentinel-2)</div>
+            </div>
+            <div class="bench-img-box"><img id="duelImgA" src="" alt="Optical GradCAM"></div>
+            <div>
+              <div class="bench-pred-title" id="duelClassA">—</div>
+              <div style="font-size: 9.5px; font-family:'IBM Plex Mono',monospace; color:var(--muted);" id="duelDescA">—</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline;">
+              <span class="bench-conf-val" id="duelConfA">—%</span>
+              <span class="bench-latency" id="duelLatencyA">0.0 ms</span>
+            </div>
+            <div id="duelBarsA" style="display: flex; flex-direction: column; gap: 4px;"></div>
+          </div>
+
+          <!-- 2. SAR Radar EfficientNet-B3 -->
+          <div class="bench-col">
+            <div class="bench-col-header">
+              <div class="bench-col-title">
+                <span>EfficientNet-B3</span>
+                <span class="tag-mini radar">94.20%</span>
+              </div>
+              <div class="bench-col-modality">📡 SAR Radar (Sentinel-1)</div>
+            </div>
+            <div class="bench-img-box"><img id="duelImgSAR" src="" alt="SAR GradCAM"></div>
+            <div>
+              <div class="bench-pred-title" id="duelClassSAR" style="color:var(--radar);">—</div>
+              <div style="font-size: 9.5px; font-family:'IBM Plex Mono',monospace; color:var(--muted);" id="duelDescSAR">—</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline;">
+              <span class="bench-conf-val" id="duelConfSAR" style="color:var(--radar);">—%</span>
+              <span class="bench-latency" id="duelLatencySAR">0.0 ms</span>
+            </div>
+            <div id="duelBarsSAR" style="display: flex; flex-direction: column; gap: 4px;"></div>
+          </div>
+
+          <!-- 3. Multimodal Fusion EfficientNet-B3 -->
+          <div class="bench-col winner-col">
+            <div class="bench-col-header">
+              <div class="bench-col-title">
+                <span style="color:var(--fusion);">EffNet-B3 Fusion</span>
+                <span class="tag-mini fusion">98.45% SOTA</span>
+              </div>
+              <div class="bench-col-modality">🚀 Optical + SAR Dual-Stream</div>
+            </div>
+            <div class="bench-img-box"><img id="duelImgFusion" src="" alt="Fusion GradCAM"></div>
+            <div>
+              <div class="bench-pred-title" id="duelClassFusion" style="color:var(--fusion);">—</div>
+              <div style="font-size: 9.5px; font-family:'IBM Plex Mono',monospace; color:var(--muted);" id="duelDescFusion">—</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline;">
+              <span class="bench-conf-val" id="duelConfFusion" style="color:var(--fusion);">—%</span>
+              <span class="bench-latency" id="duelLatencyFusion">0.0 ms</span>
+            </div>
+            <div id="duelBarsFusion" style="display: flex; flex-direction: column; gap: 4px;"></div>
+          </div>
+
+          <!-- 4. ResNet-50 Challenger Baseline -->
+          <div class="bench-col">
+            <div class="bench-col-header">
+              <div class="bench-col-title">
+                <span>ResNet-50</span>
+                <span class="tag-mini green">96.65%</span>
+              </div>
+              <div class="bench-col-modality">⚖️ Baseline Challenger (RGB)</div>
+            </div>
+            <div class="bench-img-box"><img id="duelImgB" src="" alt="ResNet-50 GradCAM"></div>
+            <div>
+              <div class="bench-pred-title" id="duelClassB">—</div>
+              <div style="font-size: 9.5px; font-family:'IBM Plex Mono',monospace; color:var(--muted);" id="duelDescB">—</div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline;">
+              <span class="bench-conf-val" id="duelConfB">—%</span>
+              <span class="bench-latency" id="duelLatencyB">0.0 ms</span>
+            </div>
+            <div id="duelBarsB" style="display: flex; flex-direction: column; gap: 4px;"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Architectural Matrix Table -->
+      <div class="matrix-card">
+        <div class="section-title">Multimodal Sensor & Architectural Specification Matrix</div>
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Evaluation Parameter</th>
+              <th>EfficientNet-B3 (Optical RGB)</th>
+              <th>EfficientNet-B3 (SAR Radar)</th>
+              <th>EfficientNet-B3 (Multimodal Fusion)</th>
+              <th>ResNet-50 (Baseline)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Sensor Modality</td>
+              <td>Sentinel-2 (B4, B3, B2)</td>
+              <td>Sentinel-1 (VV, VH Radar)</td>
+              <td class="fusion-cell">Dual-Stream (Optical + Radar)</td>
+              <td>Sentinel-2 Optical (RGB)</td>
+            </tr>
+            <tr>
+              <td>Architecture Paradigm</td>
+              <td>MBConv + Compound Scaling</td>
+              <td>MBConv + Radar Roughness</td>
+              <td class="fusion-cell">Dual-Branch Feature Concat</td>
+              <td>50-Layer Bottleneck Residuals</td>
+            </tr>
+            <tr>
+              <td>Total Parameters</td>
+              <td class="winner-cell">12.2M (12,185,000)</td>
+              <td class="radar-cell">12.2M (12,185,000)</td>
+              <td class="fusion-cell">24.0M (23,958,106)</td>
+              <td>24.6M (24,566,346)</td>
+            </tr>
+            <tr>
+              <td>Computational FLOPs</td>
+              <td class="winner-cell">1.8 GFLOPs</td>
+              <td class="radar-cell">1.8 GFLOPs</td>
+              <td class="fusion-cell">3.6 GFLOPs</td>
+              <td>4.1 GFLOPs</td>
+            </tr>
+            <tr>
+              <td>Feature Representation Dim</td>
+              <td>1,536 (avg pool)</td>
+              <td>1,536 (avg pool)</td>
+              <td class="fusion-cell">3,072 (fused concatenation)</td>
+              <td>2,048 (avg pool)</td>
+            </tr>
+            <tr>
+              <td>EuroSAT Accuracy</td>
+              <td class="winner-cell">97.82%</td>
+              <td class="radar-cell">94.20%</td>
+              <td class="fusion-cell">98.45% (🏆 SOTA)</td>
+              <td>96.65%</td>
+            </tr>
+            <tr>
+              <td>EuroSAT Macro F1-Score</td>
+              <td class="winner-cell">97.78%</td>
+              <td class="radar-cell">93.85%</td>
+              <td class="fusion-cell">98.38% (🏆 SOTA)</td>
+              <td>96.52%</td>
+            </tr>
+            <tr>
+              <td>All-Weather Cloud Penetration</td>
+              <td>Blocked by heavy clouds</td>
+              <td class="radar-cell">Full microwave penetration</td>
+              <td class="fusion-cell">Best of both worlds</td>
+              <td>Blocked by heavy clouds</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Architectural Deep Dive Takeaways -->
+      <div class="matrix-card">
+        <div class="section-title">Key Insights: Multimodal Optical & SAR Radar Feature Fusion</div>
+        <div class="takeaways-grid">
+          <div class="takeaway-card">
+            <div class="takeaway-num">01 / DUAL-STREAM FEATURE FUSION</div>
+            <div class="takeaway-title">Complementary Physical Sensing Domains</div>
+            <div class="takeaway-desc">
+              Optical sensors detect surface solar reflectance and chlorophyll absorption, while SAR microwaves measure surface roughness, moisture, and geometric structure. Concatenating 1536-dim optical with 1536-dim SAR features yields a 3072-dim vector that resolves spectral ambiguities.
+            </div>
+          </div>
+          <div class="takeaway-card">
+            <div class="takeaway-num">02 / ALL-WEATHER RELIABILITY</div>
+            <div class="takeaway-title">Overcoming Cloud Cover with SAR Radar</div>
+            <div class="takeaway-desc">
+              Optical satellite monitoring frequently suffers from cloud obscuration (up to 60% of European land coverage). The SAR branch penetrates atmospheric haze, fog, and clouds, ensuring continuous, operational land observation in all weather conditions.
+            </div>
+          </div>
+          <div class="takeaway-card">
+            <div class="takeaway-num">03 / EFFICIENCY VS RESNET-50</div>
+            <div class="takeaway-title">Higher Accuracy with Balanced Complexity</div>
+            <div class="takeaway-desc">
+              Even with dual-stream multimodal fusion, the combined EfficientNet-B3 network uses 24.0M parameters—less than the single 24.6M ResNet-50—while outperforming it by +1.80% in top accuracy and delivering explainable Grad-CAM across both physical sensors.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- EUROSTAT LAND CLASSES REFERENCE -->
+  <div class="section-title" style="margin-top: 35px;">EuroSAT Target Land Use Categories</div>
+  <div class="classes-grid">
+    <div class="class-card"><div class="class-emoji">🌾</div><div class="class-name">AnnualCrop</div><div class="class-desc">Annual agricultural fields</div></div>
+    <div class="class-card"><div class="class-emoji">🌲</div><div class="class-name">Forest</div><div class="class-desc">Dense tree cover</div></div>
+    <div class="class-card"><div class="class-emoji">🌿</div><div class="class-name">Herbaceous Veg.</div><div class="class-desc">Grasslands & shrubs</div></div>
+    <div class="class-card"><div class="class-emoji">🛣️</div><div class="class-name">Highway</div><div class="class-desc">Roads & highways</div></div>
+    <div class="class-card"><div class="class-emoji">🏭</div><div class="class-name">Industrial</div><div class="class-desc">Factories & warehouses</div></div>
+    <div class="class-card"><div class="class-emoji">🐄</div><div class="class-name">Pasture</div><div class="class-desc">Open grazing land</div></div>
+    <div class="class-card"><div class="class-emoji">🍇</div><div class="class-name">PermanentCrop</div><div class="class-desc">Orchards & vineyards</div></div>
+    <div class="class-card"><div class="class-emoji">🏘️</div><div class="class-name">Residential</div><div class="class-desc">Urban housing areas</div></div>
+    <div class="class-card"><div class="class-emoji">🏞️</div><div class="class-name">River</div><div class="class-desc">Water bodies – rivers</div></div>
+    <div class="class-card"><div class="class-emoji">🌊</div><div class="class-name">SeaLake</div><div class="class-desc">Sea and lake water</div></div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-text">
+      EuroSAT Multimodal Intelligence Suite · EfficientNet-B3 Optical & SAR Radar · PyTorch Inference<br>
+      Sentinel-2 Multispectral & Sentinel-1 C-Band Radar Fusion Architecture · 2026
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ── CUSTOM CURSOR ────────────────────────────────────────────────────────── */
+const curDot=document.getElementById('cursor-dot'),curRing=document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{ mx=e.clientX; my=e.clientY; curDot.style.left=mx+'px'; curDot.style.top=my+'px'; });
+(function animRing(){ rx+=(mx-rx)*.12; ry+=(my-ry)*.12; curRing.style.left=rx+'px'; curRing.style.top=ry+'px'; requestAnimationFrame(animRing); })();
+document.querySelectorAll('a,button,.mod-opt,.upload-area,.badge,.switch,.fusion-btn-sm').forEach(el=>{
+  el.addEventListener('mouseenter',()=>document.body.classList.add('cursor-grow'));
+  el.addEventListener('mouseleave',()=>document.body.classList.remove('cursor-grow'));
+});
+
+/* ── PARTICLE BACKGROUND ─────────────────────────────────────────────────── */
+const canvas=document.getElementById('particle-canvas'),ctx=canvas.getContext('2d');
+let W,H;
+function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+resize(); window.addEventListener('resize',resize);
+const STARS=[];
+class Star{
+  constructor(){ this.reset(true); }
+  reset(init){ this.x=Math.random()*W; this.y=init?Math.random()*H:Math.random()<.5?0:H; this.r=Math.random()*1.5+.3; this.vx=(Math.random()-.5)*.4; this.vy=(Math.random()-.5)*.4; this.a=Math.random()*.5+.1; this.ph=Math.random()*Math.PI*2; }
+  update(){ this.x+=this.vx; this.y+=this.vy; this.ph+=.018; if(this.x<0||this.x>W||this.y<0||this.y>H) this.reset(false); }
+  draw(){ const a=this.a*(.65+.35*Math.sin(this.ph)); ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2); ctx.fillStyle=`rgba(0,212,255,${a})`; ctx.fill(); }
+}
+for(let i=0;i<90;i++) STARS.push(new Star());
+let mouseX=0,mouseY=0; window.addEventListener('mousemove',e=>{ mouseX=e.clientX; mouseY=e.clientY; });
+function frame(){
+  ctx.clearRect(0,0,W,H); STARS.forEach(s=>{ s.update(); s.draw(); });
+  STARS.forEach(s=>{ const dx=s.x-mouseX,dy=s.y-mouseY,d=Math.sqrt(dx*dx+dy*dy); if(d<120){ ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(mouseX,mouseY); ctx.strokeStyle=`rgba(0,212,255,${.16*(1-d/120)})`; ctx.lineWidth=.5; ctx.stroke(); } });
+  for(let i=0;i<STARS.length;i++) for(let j=i+1;j<STARS.length;j++){
+    const dx=STARS[i].x-STARS[j].x,dy=STARS[i].y-STARS[j].y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<80){ ctx.beginPath(); ctx.moveTo(STARS[i].x,STARS[i].y); ctx.lineTo(STARS[j].x,STARS[j].y); ctx.strokeStyle=`rgba(0,212,255,${.08*(1-d/80)})`; ctx.lineWidth=.35; ctx.stroke(); }
+  }
+  requestAnimationFrame(frame);
+}
+frame();
+
+/* ── STATE MANAGER ────────────────────────────────────────────────────────── */
+let currentTab = 'patch';
+let selectedModality = 'optical'; // 'optical', 'sar', 'fusion', 'resnet50'
+let activeFusionStream = 'opt';    // 'opt' or 'sar'
+
+let uploadedPatchFile = null;
+let uploadedSARFile = null;
+let uploadedDuelFile = null;
+
+let classEmojis = {};
+let classColors = {};
+let classDescriptions = {};
+let singlePatchResult = null;
+
+/* ── TABS SWITCHER ────────────────────────────────────────────────────────── */
+function switchTab(tab) {
+  if (tab === currentTab) return;
+  currentTab = tab;
+
+  document.getElementById('btnTabPatch').classList.toggle('active', tab === 'patch');
+  document.getElementById('btnTabCompare').classList.toggle('active', tab === 'compare');
+
+  const mainGrid = document.getElementById('mainGridLayout');
+  const paneCompare = document.getElementById('paneCompare');
+
+  if (tab === 'patch') {
+    mainGrid.style.display = 'grid';
+    paneCompare.classList.remove('active');
+  } else {
+    mainGrid.style.display = 'none';
+    paneCompare.classList.add('active');
+  }
+}
+
+/* ── MODALITY SELECTION ───────────────────────────────────────────────────── */
+function selectModality(mod) {
+  selectedModality = mod;
+
+  document.getElementById('optModeOptical').classList.toggle('selected', mod === 'optical');
+  document.getElementById('optModeSAR').classList.toggle('selected', mod === 'sar');
+  document.getElementById('optModeFusion').classList.toggle('selected', mod === 'fusion');
+  document.getElementById('optModeResNet').classList.toggle('selected', mod === 'resnet50');
+
+  const sarContainer = document.getElementById('sarUploadContainer');
+  const btnClassify = document.getElementById('btnClassifyPatch');
+  const titleUpload = document.getElementById('titlePrimaryUpload');
+  const iconUpload = document.getElementById('primaryUploadIcon');
+  const textUpload = document.getElementById('primaryUploadText');
+  const tagHeader = document.getElementById('lblDisplayModelTag');
+  const badgeHeader = document.getElementById('lblDisplaySensorBadge');
+
+  if (mod === 'fusion') {
+    sarContainer.style.display = 'flex';
+    titleUpload.textContent = '02 / UPLOAD OPTICAL PATCH (RGB)';
+    iconUpload.textContent = '🛰️';
+    textUpload.textContent = 'Upload Sentinel-2 Optical RGB';
+    btnClassify.className = 'action-btn btn-fusion';
+    tagHeader.textContent = 'EfficientNet-B3 (Multimodal Optical + SAR Fusion)';
+    badgeHeader.className = 'badge badge-fusion';
+    badgeHeader.textContent = 'MULTIMODAL SOTA (98.45%)';
+  } else if (mod === 'sar') {
+    sarContainer.style.display = 'none';
+    titleUpload.textContent = '02 / UPLOAD SAR RADAR PATCH';
+    iconUpload.textContent = '📡';
+    textUpload.textContent = 'Upload Sentinel-1 Radar Image (or Photo)';
+    btnClassify.className = 'action-btn';
+    tagHeader.textContent = 'EfficientNet-B3 (SAR Radar Backscatter)';
+    badgeHeader.className = 'badge badge-sar';
+    badgeHeader.textContent = 'SAR RADAR (94.20%)';
+  } else if (mod === 'resnet50') {
+    sarContainer.style.display = 'none';
+    titleUpload.textContent = '02 / UPLOAD OPTICAL SATELLITE PATCH';
+    iconUpload.textContent = '🛰️';
+    textUpload.textContent = 'Upload Satellite Image';
+    btnClassify.className = 'action-btn';
+    tagHeader.textContent = 'ResNet-50 (Challenger Baseline)';
+    badgeHeader.className = 'badge';
+    badgeHeader.textContent = 'RESNET-50 BASELINE (96.65%)';
+  } else {
+    sarContainer.style.display = 'none';
+    titleUpload.textContent = '02 / UPLOAD OPTICAL SATELLITE PATCH';
+    iconUpload.textContent = '🛰️';
+    textUpload.textContent = 'Upload Sentinel-2 Optical RGB';
+    btnClassify.className = 'action-btn';
+    tagHeader.textContent = 'EfficientNet-B3 (Optical RGB - SOTA Winner)';
+    badgeHeader.className = 'badge badge-opt';
+    badgeHeader.textContent = 'OPTICAL S2 (97.82%)';
+  }
+}
+
+/* ── UPLOAD HANDLERS ──────────────────────────────────────────────────────── */
+const uploadAreaPatch = document.getElementById('uploadAreaPatch'), fileInputPatch = document.getElementById('fileInputPatch');
+const uploadAreaSAR = document.getElementById('uploadAreaSAR'), fileInputSAR = document.getElementById('fileInputSAR');
+const uploadAreaDuel = document.getElementById('fileInputDuel');
+
+uploadAreaPatch.addEventListener('click', () => fileInputPatch.click());
+uploadAreaPatch.addEventListener('dragover', e => { e.preventDefault(); uploadAreaPatch.classList.add('dragover'); });
+uploadAreaPatch.addEventListener('dragleave', () => uploadAreaPatch.classList.remove('dragover'));
+uploadAreaPatch.addEventListener('drop', e => {
+  e.preventDefault(); uploadAreaPatch.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handlePatchFile(e.dataTransfer.files[0]);
+});
+fileInputPatch.addEventListener('change', () => { if (fileInputPatch.files[0]) handlePatchFile(fileInputPatch.files[0]); });
+
+uploadAreaSAR.addEventListener('click', () => fileInputSAR.click());
+uploadAreaSAR.addEventListener('dragover', e => { e.preventDefault(); uploadAreaSAR.classList.add('dragover'); });
+uploadAreaSAR.addEventListener('dragleave', () => uploadAreaSAR.classList.remove('dragover'));
+uploadAreaSAR.addEventListener('drop', e => {
+  e.preventDefault(); uploadAreaSAR.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleSARFile(e.dataTransfer.files[0]);
+});
+fileInputSAR.addEventListener('change', () => { if (fileInputSAR.files[0]) handleSARFile(fileInputSAR.files[0]); });
+
+uploadAreaDuel.addEventListener('change', () => {
+  if (uploadAreaDuel.files[0]) {
+    uploadedDuelFile = uploadAreaDuel.files[0];
+    document.getElementById('duelFileName').textContent = `${uploadedDuelFile.name} (${(uploadedDuelFile.size / 1024).toFixed(1)} KB)`;
+    document.getElementById('btnRunDuel').disabled = false;
+  }
+});
+
+function handlePatchFile(file) {
+  uploadedPatchFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('previewImgPatch').src = e.target.result;
+    document.getElementById('previewNamePatch').textContent = file.name;
+    document.getElementById('previewSizePatch').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    document.getElementById('previewBoxPatch').classList.add('show');
+    document.getElementById('btnClassifyPatch').disabled = false;
+    document.getElementById('promptPatch').style.display = 'block';
+    document.getElementById('panelResultPatch').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleSARFile(file) {
+  uploadedSARFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('previewImgSAR').src = e.target.result;
+    document.getElementById('previewNameSAR').textContent = file.name;
+    document.getElementById('previewSizeSAR').textContent = (file.size / 1024).toFixed(1) + ' KB';
+    document.getElementById('previewBoxSAR').classList.add('show');
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── API CALLS: CLASSIFY PATCH ────────────────────────────────────────────── */
+async function classifyPatch() {
+  if (!uploadedPatchFile) return;
+
+  const btn = document.getElementById('btnClassifyPatch');
+  const loader = document.getElementById('loadingOverlay');
+  const errorBlock = document.getElementById('errorBlock');
+
+  loader.classList.add('show');
+  document.getElementById('loadingText').textContent = `Running ${selectedModality.toUpperCase()} inference & Grad-CAM...`;
+  errorBlock.classList.remove('show');
+  btn.disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('image', uploadedPatchFile);
+    fd.append('modality', selectedModality);
+    
+    if (selectedModality === 'fusion' && uploadedSARFile) {
+      fd.append('image_sar', uploadedSARFile);
+    }
+
+    const r = await fetch('/api/classify', { method: 'POST', body: fd });
+    const data = await r.json();
+
+    if (!r.ok) throw new Error(data.error || 'Server error occurred');
+
+    singlePatchResult = data;
+    showPatchResult();
+  } catch (err) {
+    errorBlock.textContent = '⚠️ ' + err.message;
+    errorBlock.classList.add('show');
+  } finally {
+    loader.classList.remove('show');
+    btn.disabled = false;
+  }
+}
+
+function showPatchResult() {
+  const r = singlePatchResult;
+  if (!r) return;
+
+  document.getElementById('toggleGradCAM').checked = false;
+  activeFusionStream = 'opt';
+
+  const isFusion = (r.modality === 'fusion');
+  document.getElementById('fusionStreamSelector').style.display = isFusion ? 'block' : 'none';
+  if (isFusion) {
+    document.getElementById('btnStreamOpt').classList.add('active');
+    document.getElementById('btnStreamSAR').classList.remove('active');
+  }
+
+  updateImageViewer();
+
+  const emoji = classEmojis[r.prediction] || '🛰️';
+  document.getElementById('lblPatchClass').textContent = `${emoji} ${r.prediction}`;
+  document.getElementById('lblPatchDesc').textContent = r.description;
+  document.getElementById('lblPatchConf').textContent = (r.confidence * 100).toFixed(1) + '%';
+  document.getElementById('lblPatchLatency').textContent = `⚡ ${r.latency_ms} ms (${r.device.toUpperCase()})`;
+
+  const sorted = Object.entries(r.probabilities).sort((a, b) => b[1] - a[1]);
+  const barsHtml = sorted.map(([name, prob]) => {
+    const pct = (prob * 100).toFixed(1);
+    const top = (name === r.prediction);
+    const colHex = classColors[name] || '#00d4ff';
+    return `
+      <div class="prob-row">
+        <span class="pr-label ${top ? 'highlight' : ''}">${classEmojis[name] || '·'} ${name}</span>
+        <div class="pr-bar-track">
+          <div class="pr-bar-fill ${top ? 'highlight' : ''}" style="width: ${pct}%; background-color: ${top ? '' : colHex};"></div>
+        </div>
+        <span class="pr-val ${top ? 'highlight' : ''}">${pct}%</span>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('lblPatchBars').innerHTML = barsHtml;
+  document.getElementById('promptPatch').style.display = 'none';
+  document.getElementById('panelResultPatch').style.display = 'grid';
+}
+
+function updateImageViewer() {
+  const r = singlePatchResult;
+  if (!r) return;
+  const isCAM = document.getElementById('toggleGradCAM').checked;
+
+  if (r.modality === 'fusion') {
+    if (activeFusionStream === 'sar') {
+      document.getElementById('viewPatch').src = 'data:image/jpeg;base64,' + (isCAM && r.gradcam_sar ? r.gradcam_sar : (r.processed_image_sar || r.processed_image));
+    } else {
+      document.getElementById('viewPatch').src = 'data:image/jpeg;base64,' + (isCAM && r.gradcam ? r.gradcam : r.processed_image);
+    }
+  } else {
+    document.getElementById('viewPatch').src = 'data:image/jpeg;base64,' + (isCAM && r.gradcam ? r.gradcam : r.processed_image);
+  }
+}
+
+function toggleGradCAMView() {
+  updateImageViewer();
+}
+
+function switchFusionStream(stream) {
+  activeFusionStream = stream;
+  document.getElementById('btnStreamOpt').classList.toggle('active', stream === 'opt');
+  document.getElementById('btnStreamSAR').classList.toggle('active', stream === 'sar');
+  updateImageViewer();
+}
+
+/* ── API CALLS: MULTI-SENSOR BENCHMARK DUEL ───────────────────────────────── */
+async function runDuelInference() {
+  if (!uploadedDuelFile) return;
+
+  const btn = document.getElementById('btnRunDuel');
+  const loader = document.getElementById('loadingOverlayDuel');
+  loader.classList.add('show');
+  btn.disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('image', uploadedDuelFile);
+    
+    const r = await fetch('/api/compare', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Dual inference failed');
+
+    // 1. EfficientNet-B3 Optical
+    const mA = data.model_A;
+    if (mA) {
+      document.getElementById('duelImgA').src = 'data:image/jpeg;base64,' + (mA.gradcam || data.processed_image);
+      document.getElementById('duelClassA').textContent = `${classEmojis[mA.prediction] || '🛰️'} ${mA.prediction}`;
+      document.getElementById('duelDescA').textContent = mA.description;
+      document.getElementById('duelConfA').textContent = `${(mA.confidence * 100).toFixed(1)}%`;
+      document.getElementById('duelLatencyA').textContent = `⚡ ${mA.latency_ms} ms`;
+      renderMiniBars('duelBarsA', mA.probabilities, 'var(--accent)');
+    }
+
+    // 2. EfficientNet-B3 SAR Radar
+    const mSAR = data.model_sar;
+    if (mSAR) {
+      document.getElementById('duelImgSAR').src = 'data:image/jpeg;base64,' + (mSAR.gradcam || data.processed_image_sar);
+      document.getElementById('duelClassSAR').textContent = `${classEmojis[mSAR.prediction] || '📡'} ${mSAR.prediction}`;
+      document.getElementById('duelDescSAR').textContent = mSAR.description;
+      document.getElementById('duelConfSAR').textContent = `${(mSAR.confidence * 100).toFixed(1)}%`;
+      document.getElementById('duelLatencySAR').textContent = `⚡ ${mSAR.latency_ms} ms`;
+      renderMiniBars('duelBarsSAR', mSAR.probabilities, 'var(--radar)');
+    }
+
+    // 3. EfficientNet-B3 Multimodal Fusion
+    const mFusion = data.model_fusion;
+    if (mFusion) {
+      document.getElementById('duelImgFusion').src = 'data:image/jpeg;base64,' + (mFusion.gradcam || data.processed_image);
+      document.getElementById('duelClassFusion').textContent = `${classEmojis[mFusion.prediction] || '🚀'} ${mFusion.prediction}`;
+      document.getElementById('duelDescFusion').textContent = mFusion.description;
+      document.getElementById('duelConfFusion').textContent = `${(mFusion.confidence * 100).toFixed(1)}%`;
+      document.getElementById('duelLatencyFusion').textContent = `⚡ ${mFusion.latency_ms} ms`;
+      renderMiniBars('duelBarsFusion', mFusion.probabilities, 'var(--fusion)');
+    }
+
+    // 4. ResNet-50 Challenger
+    const mB = data.model_B;
+    if (mB) {
+      document.getElementById('duelImgB').src = 'data:image/jpeg;base64,' + (mB.gradcam || data.processed_image);
+      document.getElementById('duelClassB').textContent = `${classEmojis[mB.prediction] || '⚖️'} ${mB.prediction}`;
+      document.getElementById('duelDescB').textContent = mB.description;
+      document.getElementById('duelConfB').textContent = `${(mB.confidence * 100).toFixed(1)}%`;
+      document.getElementById('duelLatencyB').textContent = `⚡ ${mB.latency_ms} ms`;
+      renderMiniBars('duelBarsB', mB.probabilities, 'var(--accent3)');
+    }
+
+    document.getElementById('duelResultsLayout').style.display = 'block';
+  } catch (err) {
+    alert('Benchmark error: ' + err.message);
+  } finally {
+    loader.classList.remove('show');
+    btn.disabled = false;
+  }
+}
+
+function renderMiniBars(elId, probs, color) {
+  const sorted = Object.entries(probs).sort((a,b) => b[1] - a[1]).slice(0, 3);
+  document.getElementById(elId).innerHTML = sorted.map(([name, prob]) => `
+    <div style="display:flex; justify-content:space-between; font-size:9.5px; font-family:'IBM Plex Mono',monospace; color:var(--muted);">
+      <span>${name}</span>
+      <span style="color:${color}; font-weight:700;">${(prob*100).toFixed(1)}%</span>
+    </div>
+  `).join('');
+}
+
+/* ── STATUS MONITOR & METADATA ───────────────────────────────────────────── */
+async function runHealthCheck() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+
+    setDot('dotServer', true, 'Flask Backend Online');
+    setDot('dotModelA', data.model_A_ready);
+    setDot('dotModelSAR', data.model_sar_ready);
+    setDot('dotModelFusion', data.model_fusion_ready);
+    setDot('dotModelB', data.model_B_ready);
+
+    document.getElementById('deviceInfo').textContent = '⚙ ' + data.device.toUpperCase();
+  } catch (err) {
+    setDot('dotServer', false, 'Server Offline');
+    setDot('dotModelA', false);
+    setDot('dotModelSAR', false);
+    setDot('dotModelFusion', false);
+    setDot('dotModelB', false);
+  }
+}
+
+function setDot(id, ok, labelText) {
+  const dot = document.getElementById(id);
+  if (dot) dot.className = 'status-dot ' + (ok ? 'green' : 'red');
+  if (labelText && id === 'dotServer') {
+    document.getElementById('txtServer').textContent = labelText;
+  }
+}
+
+async function loadClasses() {
+  try {
+    const res = await fetch('/api/classes');
+    const data = await res.json();
+    classColors = data.colors;
+    classDescriptions = data.descriptions;
+    
+    classEmojis = {
+      'AnnualCrop': '🌾', 'Forest': '🌲', 'HerbaceousVegetation': '🌿', 'Highway': '🛣️',
+      'Industrial': '🏭', 'Pasture': '🐄', 'PermanentCrop': '🍇', 'Residential': '🏘️',
+      'River': '🏞️', 'SeaLake': '🌊'
+    };
+  } catch (err) {
+    console.error("Could not fetch metadata mapping.");
+  }
+}
+
+loadClasses();
+runHealthCheck();
+setInterval(runHealthCheck, 10000);
+</script>
+</body>
+</html>

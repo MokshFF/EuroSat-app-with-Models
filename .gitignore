@@ -1,0 +1,47 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Large archives (exceeds GitHub 100MB limit)
+*.zip
+*.tar.gz
+*.rar
+eurosat_app.zip
+
+# Legacy experimental workspace folder (duplicate/deprecated weights)
+eurosat_app/
+
+# PyTorch training logs & TensorBoard events
+runs/
+*.log
+
+# Intermediate report generation artifacts
+eurosat_audit_print.html
+test_print.html
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS generated files
+.DS_Store
+Thumbs.db
